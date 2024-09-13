@@ -31,15 +31,39 @@ function SitemapExtractor() {
 
   const downloadContent = async () => {
     try {
-      const response = await axios.get('http://localhost:5001/api/download-content', { responseType: 'blob' });
+      const response = await axios.post('http://localhost:5001/api/download-content', 
+        { url: sitemapUrl },
+        { responseType: 'blob' }
+      );
+      
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers['content-disposition'];
+      const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+      const matches = filenameRegex.exec(contentDisposition);
+      const filename = matches && matches[1] ? matches[1].replace(/['"]/g, '') : 'combined_content.txt';
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', 'combined_content.txt');
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      setStatus('Error downloading content');
+      if (error.response) {
+        // r responded with a status other than 2xx
+        setStatus(`Error: ${error.response.data.error}`);
+        console.error('Download error:', error.response.data);
+      } else if (error.request) {
+        // Request was made but no response received
+        setStatus('No response from server');
+        console.error('Download error:', error.request);
+      } else {
+        // Something else happened
+        setStatus('Error downloading content');
+        console.error('Download error:', error.message);
+      }
     }
   };
 
